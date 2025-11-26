@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     DB_PASSWORD:str
     SECRET_KEY:str
     DB_HOST:str
+    MEDIA_ROOT:str = "media"
+    UPLOAD_DIR:str = "media/raw"
     OPENAI_API_KEY:str
     OPENAI_MODEL:str = "gpt-4o-mini"
     model_config = SettingsConfigDict(env_file=get_app_env())

@@ -1,3 +1,4 @@
+from core.documents.services import DocumentService
 from fastapi import Depends, HTTPException, status
 from database import sessionLocal
 from config import get_settings
@@ -11,3 +12,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_document_service(db=Depends(get_db)) -> DocumentService:
+    return DocumentService(db)

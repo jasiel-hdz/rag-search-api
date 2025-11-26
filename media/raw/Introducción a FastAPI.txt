@@ -1,0 +1,101 @@
+Título: Introducción a FastAPI
+FastAPI es un framework moderno y rápido para construir APIs en Python.
+Se basa en type hints y proporciona documentación automática con OpenAPI.
+
+Ventajas principales:
+
+Alta velocidad gracias a Starlette y ASGI.
+
+Validación automática de datos con Pydantic.
+
+Generación automática de documentación interactiva.
+
+Ideal para microservicios y APIs escalables.
+
+Conceptos clave:
+
+Router: Organiza endpoints por módulos.
+
+Schema: Define la estructura de los datos (Pydantic).
+
+Dependency Injection: Permite inyectar servicios o objetos fácilmente.
+
+Middleware: Procesa requests/responses globalmente.
+
+Async/Await: Maneja peticiones concurrentes sin bloquear.
+
+Ejemplo de endpoint básico:
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/hello")
+def say_hello():
+    return {"message": "Hello World"}
+
+
+Buenas prácticas para proyectos FastAPI:
+
+Separar la lógica en routers, servicios y schemas
+
+Usar database.py para conexión a la base de datos
+
+Crear carpetas tipo Django: apps/documents, apps/rag
+
+Guardar archivos en una carpeta uploads/
+
+Dividir documentos en chunks para RAG
+
+Documentar el proyecto con un README claro
+
+RAG (Retrieval Augmented Generation) con FastAPI:
+
+Se recibe la consulta del usuario.
+
+La consulta se convierte en embedding.
+
+Se buscan chunks similares en la base vectorial.
+
+Se pasan los chunks al LLM como contexto.
+
+Se genera la respuesta final basada en información real.
+
+Ejemplo de flujo de RAG en un endpoint FastAPI:
+
+from fastapi import APIRouter
+from app.apps.rag.service import rag_search
+
+router = APIRouter()
+
+@router.post("/rag/search")
+async def search(query: str):
+    result = await rag_search(query)
+    return result
+
+
+Chunking de documentos:
+
+Dividir texto en fragmentos de 300-500 caracteres.
+
+Cada chunk se convierte en embedding y se almacena en DB o vector store.
+
+Permite búsqueda rápida y generación de respuestas precisas.
+
+Tipos de documentos recomendados para RAG:
+
+PDF → Manuales, informes, documentación
+
+TXT → Notas simples, datos de prueba
+
+MD → Documentación técnica (opcional)
+
+Resumen:
+Este TXT sirve como dataset inicial para tu mini-proyecto RAG sobre FastAPI.
+Permite probar:
+
+Upload de documentos
+
+Chunking y embeddings
+
+Endpoint /rag/search

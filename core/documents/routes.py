@@ -1,21 +1,21 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy.orm import Session
-from core.documents.schema import DocumentRecord
-from dependencies import get_db
-from .service import llm_service
+from fastapi import APIRouter, Depends, UploadFile
+from fastapi.responses import JSONResponse
+from core.documents.services import DocumentService
+from core.utils import validate_document_file
+from dependencies import get_document_service
+from fastapi.encoders import jsonable_encoder
 
 documents_router = APIRouter()
 
-@documents_router.post("/upload", response_model=DocumentRecord, status_code=201)
-def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)) -> DocumentRecord:
+@documents_router.post("/upload")
+async def upload_document(
+    file: UploadFile = Depends(validate_document_file),
+    document_service: DocumentService = Depends(get_document_service)
+) -> JSONResponse:
     """
-    Endpoint to upload a document and save it to the database
-    
-    Args:
-        file: The document file to upload
-        db: Database session
-        
-    Returns:
-        DocumentRecord: The saved record with id, filename and content
+    Endpoint para subir un archivo .txt o .pdf
+    La validación de extensión se hace mediante la dependencia validate_document_file
     """
-    return DocumentRecord(id=1, filename="test.pdf", content="test content")
+    # Usar el servicio para procesar el documento
+    result = await document_service.upload_document(file)
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
