@@ -1,0 +1,27 @@
+volumes:
+  app_data:
+  postgres_data:
+  
+services:
+  app:
+    build: .
+    image: rag-search-api
+    container_name: rag-search-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    volumes:
+      - app_data:/app_data
+  postgres:
+    image: postgres
+    container_name: rag-search-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
