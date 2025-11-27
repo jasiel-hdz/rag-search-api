@@ -6,6 +6,7 @@ from typing import Dict, Any
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from pypdf import PdfReader
 
 from core.documents.models import Document, Chunk
 from core.vector.service import get_vector_service
@@ -134,6 +135,7 @@ class DocumentService:
             
         Raises:
             ValueError: If file type is not supported
+            HTTPException: If PDF extraction fails
         """
         if file_location.endswith(".txt"):
             try:
@@ -144,9 +146,62 @@ class DocumentService:
                 with open(file_location, "r", encoding="latin-1") as f:
                     return f.read()
         elif file_location.endswith(".pdf"):
-            raise ValueError("PDF extraction not yet implemented")
+            return self._extract_text_from_pdf(file_location)
         else:
             raise ValueError(f"Unsupported file type: {os.path.splitext(file_location)[1]}")
+    
+    def _extract_text_from_pdf(self, file_location: str) -> str:
+        """
+        Extracts text from a PDF file.
+        
+        Args:
+            file_location: Path to the PDF file
+            
+        Returns:
+            Extracted text from all pages
+            
+        Raises:
+            HTTPException: If PDF extraction fails
+        """
+        try:
+            reader = PdfReader(file_location)
+            text_parts = []
+            
+            # Extract text from each page
+            for page_num, page in enumerate(reader.pages, 1):
+                try:
+                    page_text = page.extract_text()
+                    if page_text.strip():  # Only add non-empty pages
+                        text_parts.append(page_text)
+                except Exception as e:
+                    # Log warning but continue with other pages
+                    print(f"Warning: Could not extract text from page {page_num}: {str(e)}")
+                    continue
+            
+            if not text_parts:
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF file appears to be empty or contains no extractable text. The PDF might be image-based or encrypted."
+                )
+            
+            # Join all pages with double newline for readability
+            full_text = "\n\n".join(text_parts)
+            
+            if not full_text.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF file contains no extractable text. The PDF might be image-based or encrypted."
+                )
+            
+            return full_text
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error extracting text from PDF: {str(e)}"
+            )
     
     def _create_document_with_chunks(self, filename: str, text: str) -> tuple[Document, int]:
         """
