@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.documents.models import Document, Chunk
+from core.vector.service import get_vector_service
 from config import get_settings
 
 settings = get_settings()
@@ -21,33 +22,33 @@ class DocumentService:
         
     async def upload_document(self, file: UploadFile) -> Dict[str, Any]:
         """
-        Sube un documento y procesa el archivo.
-        Guarda el archivo, extrae el texto, crea el registro en BD y genera chunks.
+        Uploads a document and processes the file.
+        Saves the file, extracts text, creates database record and generates chunks.
         
         Args:
-            file: El archivo a subir
+            file: The file to upload
             
         Returns:
-            Dict con información del documento procesado
+            Dict with information about the processed document
             
         Raises:
-            HTTPException: Si ocurre algún error durante el proceso
+            HTTPException: If an error occurs during the process
         """
         file_location = None
         try:
-            # Asegurar que el directorio de upload existe
+            # Ensure upload directory exists
             self._ensure_upload_directory_exists()
             
-            # Guardar archivo en disco
+            # Save file to disk
             file_location = await self._save_file(file)
             
-            # Extraer el texto del archivo
+            # Extract text from file
             text = self._extract_text_from_file(file_location)
             
-            # Crear registro en base de datos y chunks en una transacción
+            # Create database record and chunks in a transaction
             document, chunks_count = self._create_document_with_chunks(file.filename, text)
             
-            # Retornar información del documento procesado
+            # Return processed document information
             return {
                 "message": f"Document '{file.filename}' uploaded successfully",
                 "document_id": document.id,
@@ -56,19 +57,19 @@ class DocumentService:
             }
             
         except HTTPException:
-            # Re-lanzar HTTPException sin modificar
+            # Re-raise HTTPException without modification
             raise
         except (OSError, IOError) as e:
-            # Limpiar archivo si existe y hubo error de I/O
+            # Clean up file if it exists and there was an I/O error
             if file_location and os.path.exists(file_location):
                 try:
                     os.remove(file_location)
                 except OSError:
-                    pass  # Ignorar errores al limpiar
+                    pass  # Ignore cleanup errors
             
-            self._handle_exception(e, f"Error al guardar o leer el archivo: {str(e)}")
+            self._handle_exception(e, f"Error saving or reading file: {str(e)}")
         except ValueError as e:
-            # Limpiar archivo si existe y hubo error de validación
+            # Clean up file if it exists and there was a validation error
             if file_location and os.path.exists(file_location):
                 try:
                     os.remove(file_location)
@@ -77,42 +78,42 @@ class DocumentService:
             
             raise HTTPException(status_code=400, detail=str(e))
         except SQLAlchemyError as e:
-            # Limpiar archivo si existe y hubo error de BD
+            # Clean up file if it exists and there was a database error
             if file_location and os.path.exists(file_location):
                 try:
                     os.remove(file_location)
                 except OSError:
                     pass
             
-            self._handle_database_exception(e, "Error al guardar el documento en la base de datos")
+            self._handle_database_exception(e, "Error saving document to database")
         except Exception as e:
-            # Limpiar archivo si existe y hubo error inesperado
+            # Clean up file if it exists and there was an unexpected error
             if file_location and os.path.exists(file_location):
                 try:
                     os.remove(file_location)
                 except OSError:
                     pass
             
-            self._handle_exception(e, f"Error inesperado al procesar el documento: {str(e)}")
+            self._handle_exception(e, f"Unexpected error processing document: {str(e)}")
     
     def _ensure_upload_directory_exists(self) -> None:
-        """Asegura que el directorio de upload existe, lo crea si no existe."""
+        """Ensures the upload directory exists, creates it if it doesn't."""
         upload_dir = Path(settings.UPLOAD_DIR)
         upload_dir.mkdir(parents=True, exist_ok=True)
     
     async def _save_file(self, file: UploadFile) -> str:
         """
-        Guarda el archivo en el directorio de upload.
+        Saves the file to the upload directory.
         
         Args:
-            file: El archivo a guardar
+            file: The file to save
             
         Returns:
-            Ruta completa del archivo guardado
+            Full path of the saved file
         """
         file_location = os.path.join(settings.UPLOAD_DIR, file.filename)
         
-        # Resetear el puntero del archivo por si ya fue leído
+        # Reset file pointer in case it was already read
         await file.seek(0)
         content = await file.read()
         
@@ -123,52 +124,53 @@ class DocumentService:
     
     def _extract_text_from_file(self, file_location: str) -> str:
         """
-        Extrae el texto del archivo según su tipo.
+        Extracts text from file according to its type.
         
         Args:
-            file_location: Ruta del archivo
+            file_location: File path
             
         Returns:
-            Texto extraído del archivo
+            Extracted text from file
             
         Raises:
-            ValueError: Si el tipo de archivo no es soportado
+            ValueError: If file type is not supported
         """
         if file_location.endswith(".txt"):
             try:
                 with open(file_location, "r", encoding="utf-8") as f:
                     return f.read()
             except UnicodeDecodeError:
-                # Intentar con latin-1 si utf-8 falla
+                # Try latin-1 if utf-8 fails
                 with open(file_location, "r", encoding="latin-1") as f:
                     return f.read()
         elif file_location.endswith(".pdf"):
-            raise ValueError("Extracción de PDF aún no implementada")
+            raise ValueError("PDF extraction not yet implemented")
         else:
-            raise ValueError(f"Tipo de archivo no soportado: {os.path.splitext(file_location)[1]}")
+            raise ValueError(f"Unsupported file type: {os.path.splitext(file_location)[1]}")
     
     def _create_document_with_chunks(self, filename: str, text: str) -> tuple[Document, int]:
         """
-        Crea el documento y sus chunks en una transacción.
+        Creates the document and its chunks in a transaction.
+        Also generates and saves embeddings in ChromaDB.
         
         Args:
-            filename: Nombre del archivo
-            text: Contenido del texto
+            filename: File name
+            text: Text content
             
         Returns:
-            Tupla con (Document, número de chunks creados)
+            Tuple with (Document, number of chunks created)
         """
         try:
-            # Crear documento
+            # Create document
             document = Document(
                 filename=filename,
                 content=text,
                 created_at=datetime.datetime.now(datetime.timezone.utc)
             )
             self.db.add(document)
-            self.db.flush()  # Para obtener el ID sin hacer commit
+            self.db.flush()  # To get ID without committing
             
-            # Crear chunks
+            # Create chunks
             chunks = []
             for i in range(0, len(text), CHUNK_SIZE):
                 chunk_text = text[i:i + CHUNK_SIZE]
@@ -179,24 +181,59 @@ class DocumentService:
                 self.db.add(chunk)
                 chunks.append(chunk)
             
-            # Commit de toda la transacción
+            # Commit entire transaction
             self.db.commit()
             self.db.refresh(document)
+            
+            # Generate and save embeddings in ChromaDB (after commit)
+            try:
+                self._save_chunks_embeddings(chunks, document.id)
+            except Exception as e:
+                self._handle_exception(e, f"Error saving embeddings to ChromaDB: {str(e)}")
+                self.db.rollback()
             
             return document, len(chunks)
             
         except SQLAlchemyError:
-            # Rollback en caso de error
+            # Rollback on error
             self.db.rollback()
+            raise
+    
+    def _save_chunks_embeddings(self, chunks: list[Chunk], document_id: int) -> None:
+        """
+        Saves chunk embeddings to ChromaDB.
+        
+        Args:
+            chunks: List of Chunk objects
+            document_id: Document ID
+        """
+        try:
+            # Prepare data for ChromaDB
+            chunks_data = [
+                {
+                    "id": chunk.id,
+                    "text": chunk.text
+                }
+                for chunk in chunks
+            ]
+            
+            # Get vector service and save embeddings
+            collection_name = settings.CHROMA_COLLECTION_NAME
+            vector_service = get_vector_service(collection_name=collection_name)
+            vector_service.add_chunks(chunks_data, document_id)
+            
+        except Exception as e:
+            # Log error but don't fail main operation
+            print(f"Error saving embeddings: {str(e)}")
             raise
     
     def _handle_database_exception(self, exception: Exception, message: str) -> None:
         """
-        Maneja excepciones de base de datos.
+        Handles database exceptions.
         
         Args:
-            exception: La excepción ocurrida
-            message: Mensaje descriptivo del error
+            exception: The exception that occurred
+            message: Descriptive error message
         """
         if self.db:
             self.db.rollback()
@@ -210,11 +247,11 @@ class DocumentService:
     
     def _handle_exception(self, exception: Exception, message: str) -> None:
         """
-        Maneja excepciones generales.
+        Handles general exceptions.
         
         Args:
-            exception: La excepción ocurrida
-            message: Mensaje descriptivo del error
+            exception: The exception that occurred
+            message: Descriptive error message
         """
         print(f"{message}: {exception}")
         

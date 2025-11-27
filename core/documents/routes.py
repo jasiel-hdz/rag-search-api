@@ -13,9 +13,9 @@ async def upload_document(
     document_service: DocumentService = Depends(get_document_service)
 ) -> JSONResponse:
     """
-    Endpoint para subir un archivo .txt o .pdf
-    La validación de extensión se hace mediante la dependencia validate_document_file
+    Endpoint to upload a .txt or .pdf file.
+    File extension validation is done via the validate_document_file dependency.
     """
-    # Usar el servicio para procesar el documento
+    # Use service to process the document
     result = await document_service.upload_document(file)
     return JSONResponse(status_code=201, content=jsonable_encoder(result))

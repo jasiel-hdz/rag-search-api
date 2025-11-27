@@ -52,6 +52,15 @@ venv.bak/
 *.sqlite
 *.sqlite3
 
+# Vector Database (ChromaDB)
+data/chroma_db/
+chroma_db/
+*.chroma
+
+# Media files (user uploaded documents)
+media/raw/
+media/raw/**
+
 # Logs
 *.log
 logs/

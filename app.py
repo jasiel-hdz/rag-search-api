@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from database import Base, engine
 
 from core.documents.routes import documents_router
+from core.rag.routes import rag_router
 
 
 app = FastAPI(
@@ -17,6 +18,7 @@ app = FastAPI(
 api = '/api/v1'
 
 app.include_router(documents_router, prefix=f'{api}/documents', tags=['documents'])
+app.include_router(rag_router, prefix=f'{api}/rag', tags=['rag'])
 
 Base.metadata.create_all(bind=engine)
 

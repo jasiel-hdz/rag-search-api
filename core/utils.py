@@ -5,15 +5,15 @@ import os
 
 def create_file_extension_validator(allowed_extensions: Set[str], error_message: str = None):
     """
-    Factory function que crea un validador de extensiones de archivo configurable.
-    Útil para crear validadores reutilizables con diferentes extensiones permitidas.
+    Factory function that creates a configurable file extension validator.
+    Useful for creating reusable validators with different allowed extensions.
     
     Args:
-        allowed_extensions: Conjunto de extensiones permitidas (ej: {".txt", ".pdf"})
-        error_message: Mensaje de error personalizado. Si es None, se genera automáticamente.
+        allowed_extensions: Set of allowed extensions (e.g., {".txt", ".pdf"})
+        error_message: Custom error message. If None, automatically generated.
         
     Returns:
-        Función validadora que puede usarse como dependencia de FastAPI
+        Validator function that can be used as a FastAPI dependency
         
     Example:
         >>> validator = create_file_extension_validator({".txt", ".pdf"})
@@ -23,37 +23,37 @@ def create_file_extension_validator(allowed_extensions: Set[str], error_message:
     """
     def validate_file_extension(file: UploadFile = File(...)) -> UploadFile:
         """
-        Valida que el archivo subido tenga una extensión permitida.
-        Lanza HTTPException si la validación falla.
+        Validates that the uploaded file has an allowed extension.
+        Raises HTTPException if validation fails.
         
         Args:
-            file: El archivo a validar (obtenido mediante File(...))
+            file: File to validate (obtained via File(...))
             
         Returns:
-            UploadFile: El archivo validado
+            UploadFile: Validated file
             
         Raises:
-            HTTPException: Si el archivo no tiene nombre o extensión no permitida
+            HTTPException: If file has no name or extension is not allowed
         """
         if not file.filename:
             raise HTTPException(
                 status_code=400, 
-                detail="El archivo debe tener un nombre"
+                detail="File must have a name"
             )
         
-        # Obtener la extensión del archivo
+        # Get file extension
         file_extension = os.path.splitext(file.filename)[1].lower()
         
-        # Validar que la extensión esté permitida
+        # Validate extension is allowed
         if file_extension not in allowed_extensions:
             if error_message:
                 detail = error_message
             else:
                 extensions_str = ", ".join(sorted(allowed_extensions))
                 detail = (
-                    f"Tipo de archivo no permitido. "
-                    f"Solo se permiten archivos {extensions_str}. "
-                    f"Recibido: {file_extension}"
+                    f"File type not allowed. "
+                    f"Only {extensions_str} files are allowed. "
+                    f"Received: {file_extension}"
                 )
             
             raise HTTPException(status_code=400, detail=detail)
@@ -63,14 +63,14 @@ def create_file_extension_validator(allowed_extensions: Set[str], error_message:
     return validate_file_extension
 
 
-# Validadores predefinidos para uso común
+# Predefined validators for common use
 validate_document_file = create_file_extension_validator(
     allowed_extensions={".txt", ".pdf"},
-    error_message="Solo se permiten archivos .txt y .pdf"
+    error_message="Only .txt and .pdf files are allowed"
 )
 
 validate_image_file = create_file_extension_validator(
     allowed_extensions={".jpg", ".jpeg", ".png", ".gif", ".webp"},
-    error_message="Solo se permiten archivos de imagen (.jpg, .jpeg, .png, .gif, .webp)"
+    error_message="Only image files (.jpg, .jpeg, .png, .gif, .webp) are allowed"
 )
 
